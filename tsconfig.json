@@ -11,6 +11,8 @@
         "resolveJsonModule": true,
         "isolatedModules": true,
         "forceConsistentCasingInFileNames": true,
+        "declaration": true,
+        "declarationMap": true,
         "lib": ["dom", "dom.iterable", "esnext"]
     },
     "include": ["src/**/*.ts"],
