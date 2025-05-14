@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    targetNamespace="http://example.com/empty"
+    xmlns="http://example.com/empty"
+    elementFormDefault="qualified">
+
+    <xs:element name="NoElementsReq" type="EmptyEndpointType" />
+    <xs:element name="NoElementsRes" type="EmptyEndpointType" />
+
+    <!-- Complex type with an empty sequence -->
+    <xs:complexType name="EmptyEndpointType">
+        <xs:sequence />
+    </xs:complexType>
+
+</xs:schema>

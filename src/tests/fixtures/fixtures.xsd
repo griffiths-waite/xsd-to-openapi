@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <xsd:element name="TestReq" type="tTestReq" />
+    <xsd:complexType name="tTestReq">
+        <xsd:sequence>
+            <xsd:element name="required" type="xsd:string" minOccurs="1" />
+            <xsd:element name="optional" type="xsd:string" minOccurs="0" />
+        </xsd:sequence>
+    </xsd:complexType>
+</xsd:schema>
