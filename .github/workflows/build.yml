@@ -16,5 +16,6 @@ jobs:
                   node-version: 22.x
                   cache: "pnpm"
             - run: pnpm install
+            - run: pnpm changeset status --since=origin/main
             - run: pnpm run lint && pnpm run build
             - run: pnpm test:coverage
