@@ -2,13 +2,32 @@
     "name": "xsd-to-openapi",
     "version": "1.0.0",
     "description": "",
+    "author": "Griffiths Waite",
+    "license": "MIT",
     "main": "dist/index.js",
-    "scripts": {
-        "build": "tsup",
-        "lint": "tsc",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage"
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.mts",
+                "default": "./dist/esm/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "default": "./dist/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/griffiths-waite/xsd-to-openapi"
     },
     "keywords": [
         "xml",
@@ -20,8 +39,13 @@
         "yaml",
         "yml"
     ],
-    "author": "Griffiths Waite",
-    "license": "MIT",
+    "scripts": {
+        "build": "tsup",
+        "lint": "tsc",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
+    },
     "packageManager": "pnpm@10.5.2",
     "dependencies": {
         "prettier": "^3.5.3"
