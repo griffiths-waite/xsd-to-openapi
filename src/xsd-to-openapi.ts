@@ -121,6 +121,7 @@ export interface XsdToOpenApiConfig {
     schemaName?: string;
     xsdContent?: string;
     useSchemaNameInPath?: boolean;
+    errorSchema?: Schema;
 }
 
 /**
@@ -132,6 +133,7 @@ export async function xsdToOpenApi({
     schemaName,
     xsdContent,
     useSchemaNameInPath = false,
+    errorSchema
 }: XsdToOpenApiConfig) {
     const parser = new XMLParser({
         ignoreAttributes: false,
@@ -173,6 +175,7 @@ export async function xsdToOpenApi({
             inputFilePath || '',
             useSchemaNameInPath,
             parser,
+            errorSchema
         );
 
         const openapiJson = JSON.stringify(generatedSpec, undefined, 2);
@@ -225,6 +228,7 @@ type GenerateSchemaParams = {
     typeName: string;
     resolvedTypes?: Set<string>;
     importedSchemas?: ImportedSchemasMap;
+    errorSchema?: Schema;
 };
 
 function generateSchema({
@@ -232,6 +236,7 @@ function generateSchema({
     typeName,
     resolvedTypes = new Set<string>(),
     importedSchemas,
+    errorSchema,
 }: GenerateSchemaParams) {
     const complexTypes: XsdComplexType[] = Array.isArray(schema['xsd:complexType'])
         ? schema['xsd:complexType']
@@ -384,42 +389,13 @@ function resolveType(element?: XsdElement): ResolveTypeResult {
     return { typeName: rawType };
 }
 
-const notOkSchema: Schema = {
-    type: 'object',
-    properties: {
-        Nok: {
-            type: 'object',
-            properties: {
-                Code: { type: 'string' },
-                Description: { type: 'string' },
-                VariableList: {
-                    type: 'object',
-                    properties: {
-                        Variable: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    Context: { type: 'string' },
-                                    Value: { type: 'string' },
-                                },
-                                required: ['Value'],
-                            },
-                        },
-                    },
-                },
-            },
-            required: ['Code'],
-        },
-    },
-};
-
 async function generateOpenApiSpec(
     schema: XsdObject['xsd:schema'],
     schemaName: string,
     inputFilePath: string,
     useSchemaNameInPath: boolean,
     parser: XMLParser,
+    errorSchema?: Schema,
 ) {
     const openApiSpec: OpenApiSpec = {
         openapi: '3.1.0',
@@ -476,7 +452,7 @@ async function generateOpenApiSpec(
                         description: 'Internal server error',
                         content: {
                             'application/json': {
-                                schema: notOkSchema,
+                                schema: errorSchema || { type: 'object' },
                             },
                         },
                     },
