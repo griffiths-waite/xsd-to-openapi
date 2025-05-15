@@ -176,7 +176,7 @@ export interface XsdToOpenApiConfig {
  * @param specGenerationOptions.error - Error schema options.
  * @param specGenerationOptions.error.errorSchema - JSON Schema for the error response.
  * @param specGenerationOptions.error.errorStatusCode - HTTP status code for the error response.
- * @param specGenerationOptions.error.errorDescription - Description for the error response.
+ * @param specGenerationOptions.error.errorDescription - Description for the error response schema.
  *
  */
 export async function xsdToOpenApi({
