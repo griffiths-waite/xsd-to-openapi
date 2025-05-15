@@ -64,42 +64,45 @@ interface Operation {
     >;
 }
 
-interface XsdImport {
+interface XsdAnnotation {
+    "xsd:appinfo"?: string | string[];
+    "xs:appinfo"?: string | string[];
+    "xsd:documentation"?: string | string[];
+    "xs:documentation"?: string | string[];
+}
+
+interface BaseXsdElement {
+    "xsd:annotation"?: XsdAnnotation[];
+    "xs:annotation"?: XsdAnnotation[];
+}
+
+interface XsdImport extends BaseXsdElement {
     "@_namespace": string;
     "@_schemaLocation": string;
 }
 
-interface XsdAnnotation {
-    "xsd:appinfo"?: string;
-    "xs:appinfo"?: string;
-    "xsd:documentation"?: string;
-    "xs:documentation"?: string;
-}
-
-interface XsdElement {
+interface XsdElement extends BaseXsdElement {
     "@_name": string;
     "@_type"?: string;
     "@_maxOccurs"?: string;
     "@_minOccurs"?: string;
     "@_default"?: string;
     "@_fixed"?: string;
-    "xsd:annotation"?: XsdAnnotation[];
-    "xs:annotation"?: XsdAnnotation[];
 }
 
-interface XsdSequence {
+interface XsdSequence extends BaseXsdElement {
     "xsd:element"?: XsdElement[];
     "xsd:choice"?: XsdChoice[];
     "xs:element"?: XsdElement[];
     "xs:choice"?: XsdChoice[];
 }
 
-interface XsdChoice {
+interface XsdChoice extends BaseXsdElement {
     "xsd:sequence"?: XsdSequence[];
     "xs:sequence"?: XsdSequence[];
 }
 
-interface XsdComplexType {
+interface XsdComplexType extends BaseXsdElement {
     "@_name": string;
     "xsd:sequence"?: XsdSequence[];
     "xsd:choice"?: XsdChoice[];
@@ -107,22 +110,16 @@ interface XsdComplexType {
     "xs:choice"?: XsdChoice[];
 }
 
-interface XsdSchema {
+interface XsdSchema extends BaseXsdElement {
     "@_targetNamespace"?: string;
     "@_id"?: string;
-    "xsd:annotation"?: {
-        "xsd:documentation"?: string;
-    };
-    "xsd:complexType": XsdComplexType[] | XsdComplexType;
-    "xsd:simpleType"?: unknown[] | unknown;
-    "xsd:element": XsdElement[] | XsdElement;
+    "xsd:complexType": XsdComplexType | XsdComplexType[];
+    "xsd:simpleType"?: unknown | unknown[];
+    "xsd:element": XsdElement | XsdElement[];
     "xsd:import"?: XsdImport[];
-    "xs:annotation"?: {
-        "xs:documentation"?: string;
-    };
-    "xs:complexType"?: XsdComplexType[] | XsdComplexType;
-    "xs:simpleType"?: unknown[] | unknown;
-    "xs:element"?: XsdElement[] | XsdElement;
+    "xs:complexType"?: XsdComplexType | XsdComplexType[];
+    "xs:simpleType"?: unknown | unknown[];
+    "xs:element"?: XsdElement | XsdElement[];
     "xs:import"?: XsdImport[];
     [key: string]: any; // Required for detecting xml namespace prefixes
 }
@@ -185,7 +182,7 @@ export async function xsdToOpenApi({
     try {
         const xsdObj: XsdObject = inputFilePath
             ? parser.parse(await readFile(inputFilePath, "utf8"))
-            : parser.parse(xsdContent || "");
+            : parser.parse(xsdContent as string);
 
         const xsdSchema = xsdObj["xsd:schema"] || xsdObj["xs:schema"];
 
@@ -338,8 +335,8 @@ function generateSchema({
         const elementDefault = element["@_default"] || null;
         const elementFixed = element["@_fixed"] || null;
         const elementDescription =
-            element["xsd:annotation"]?.[0]?.["xsd:documentation"] ||
-            element["xs:annotation"]?.[0]?.["xs:documentation"];
+            element["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+            element["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
 
         if (!elementMinOccurs || elementMinOccurs === "1") {
             if (!openApiSchema.required) {
@@ -530,14 +527,8 @@ async function generateOpenApiSpec(
 
         const openApiPathName = useSchemaNameInPath ? `/${schemaName}/${pathName}` : `/${pathName}`;
 
-        const operationDescription =
-            request?.["xsd:annotation"]?.[0]?.["xsd:documentation"] ||
-            request?.["xs:annotation"]?.[0]?.["xs:documentation"] ||
-            "";
-
         const operation: Operation = {
             summary: `${httpMethod.toUpperCase()} ${openApiPathName}`,
-            description: operationDescription,
             responses: {},
         };
 
@@ -558,7 +549,9 @@ async function generateOpenApiSpec(
         }
 
         if (response) {
-            const responseDescription = response["xsd:annotation"]?.[0]?.["xsd:documentation"] || "";
+            const responseDescription =
+                response["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+                response["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
 
             operation.responses["200"] = {
                 description: responseDescription,
