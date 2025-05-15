@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://example.com/ordering"
+    xmlns:po="http://example.com/purchase-order"
+    targetNamespace="http://example.com/ordering"
+    elementFormDefault="qualified">
+
+    <!-- import an external purchase-order schema -->
+    <xs:import namespace="http://example.com/purchase-order" schemaLocation="purchase-order.xsd" />
+
+    <!-- CreateOrder request using the imported PurchaseOrder type -->
+    <xs:element name="CreateOrderRequest" type="tns:tCreateOrderRequest" />
+    <xs:complexType name="tCreateOrderRequest">
+        <xs:sequence>
+            <!-- declare po prefix here if not already on the root -->
+            <xs:element name="PurchaseOrder" type="po:PurchaseOrderRequestType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- CreateOrder response -->
+    <xs:element name="CreateOrderResponse" type="tns:tCreateOrderResponse" />
+    <xs:complexType name="tCreateOrderResponse">
+        <xs:sequence>
+            <xs:element name="OrderStatus" type="xs:string" />
+            <xs:element name="ConfirmationID" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>

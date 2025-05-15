@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <!-- GetUserDetails Operation -->
+    <xs:element name="GetUserDetailsRequest" type="GetUserDetailsRequestType" />
+    <xs:element name="GetUserDetailsResponse" type="GetUserDetailsResponseType" />
+
+    <xs:complexType name="GetUserDetailsRequestType">
+        <xs:sequence>
+            <xs:element name="UserID" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="GetUserDetailsResponseType">
+        <xs:sequence>
+            <xs:element name="UserDetails" type="UserDetailsType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="UserDetailsType">
+        <xs:choice>
+            <xs:element name="Name" type="xs:string" />
+            <xs:element name="Email" type="xs:string" />
+            <xs:element name="PhoneNumber" type="xs:string" />
+        </xs:choice>
+    </xs:complexType>
+
+    <!-- CreateOrder Operation -->
+    <xs:element name="CreateOrderRequest" type="CreateOrderRequestType" />
+    <xs:element name="CreateOrderResponse" type="CreateOrderResponseType" />
+
+    <xs:complexType name="CreateOrderRequestType">
+        <xs:sequence>
+            <xs:element name="OrderID" type="xs:string" />
+            <xs:element name="OrderDetails" type="OrderDetailsType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="CreateOrderResponseType">
+        <xs:sequence>
+            <xs:element name="OrderStatus" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="OrderDetailsType">
+        <xs:choice>
+            <xs:element name="ProductID" type="xs:string" />
+            <xs:element name="ProductName" type="xs:string" />
+            <xs:element name="ProductDescription" type="xs:string" />
+        </xs:choice>
+    </xs:complexType>
+
+    <!-- ProcessPayment Operation -->
+    <xs:element name="ProcessPaymentRequest" type="ProcessPaymentRequestType" />
+    <xs:element name="ProcessPaymentResponse" type="ProcessPaymentResponseType" />
+
+    <xs:complexType name="ProcessPaymentRequestType">
+        <xs:sequence>
+            <xs:element name="PaymentMethod" type="PaymentMethodType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ProcessPaymentResponseType">
+        <xs:sequence>
+            <xs:element name="ConfirmationID" type="xs:string" />
+            <xs:element name="SuccessMessage" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="PaymentMethodType">
+        <xs:choice>
+            <xs:element name="CreditCardNumber" type="xs:string" />
+            <xs:element name="PaypalAccount" type="xs:string" />
+        </xs:choice>
+    </xs:complexType>
+
+</xs:schema>

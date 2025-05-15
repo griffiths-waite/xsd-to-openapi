@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://example.com"
+    targetNamespace="http://example.com">
+    <xsd:element name="TestReq" type="tns:tTestReq" />
+    <xsd:complexType name="tTestReq">
+        <xsd:sequence>
+            <xsd:element name="stringField" type="xsd:string" />
+            <xsd:element name="numberField" type="xsd:decimal" />
+            <xsd:element name="nestedField" type="tns:tNestedType" />
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:complexType name="tNestedType">
+        <xsd:sequence>
+            <xsd:element name="nestedString" type="xsd:string" />
+        </xsd:sequence>
+    </xsd:complexType>
+</xsd:schema>

@@ -1,18 +1,18 @@
-import { XMLParser } from 'fast-xml-parser';
-import { existsSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { basename, dirname, join } from 'path';
+import { XMLParser } from "fast-xml-parser";
+import { existsSync } from "fs";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import { basename, dirname, join } from "path";
 
 const openApiTypeMap = {
-    string: 'string',
-    decimal: 'number',
-    float: 'number',
-    double: 'number',
-    integer: 'integer',
-    boolean: 'boolean',
-    date: 'string',
-    dateTime: 'string',
-    time: 'string',
+    string: "string",
+    decimal: "number",
+    float: "number",
+    double: "number",
+    integer: "integer",
+    boolean: "boolean",
+    date: "string",
+    dateTime: "string",
+    time: "string",
 } as const;
 
 type OpenApiType = keyof typeof openApiTypeMap;
@@ -42,18 +42,24 @@ interface SchemaProperty {
 }
 
 interface Schema {
-    type: string;
+    type?: string;
     properties?: Record<string, SchemaProperty>;
     required?: string[];
     items?: Schema;
+    oneOf?: Schema[];
+    anyOf?: Schema[];
 }
 
 interface Operation {
-    summary: string;
+    operationId?: string;
+    tags?: string[];
+    summary?: string;
     description?: string;
+    deprecated?: boolean;
     requestBody?: {
         required: boolean;
         content: Record<string, { schema: Schema }>;
+        description?: string;
     };
     responses: Record<
         string,
@@ -64,64 +70,88 @@ interface Operation {
     >;
 }
 
-interface XsdImport {
-    '@_namespace': string;
-    '@_schemaLocation': string;
-}
-
 interface XsdAnnotation {
-    'xsd:documentation': string;
+    "xsd:appinfo"?: string | string[];
+    "xs:appinfo"?: string | string[];
+    "xsd:documentation"?: string | string[];
+    "xs:documentation"?: string | string[];
 }
 
-interface XsdElement {
-    '@_name': string;
-    '@_type'?: string;
-    '@_maxOccurs'?: string;
-    '@_minOccurs'?: string;
-    '@_default'?: string;
-    '@_fixed'?: string;
-    'xsd:annotation'?: XsdAnnotation[];
+interface BaseXsdElement {
+    "xsd:annotation"?: XsdAnnotation[];
+    "xs:annotation"?: XsdAnnotation[];
 }
 
-interface XsdSequence {
-    'xsd:element': XsdElement[];
-    'xsd:choice'?: XsdChoice[];
+interface XsdImport extends BaseXsdElement {
+    "@_namespace": string;
+    "@_schemaLocation": string;
 }
 
-interface XsdChoice {
-    'xsd:sequence': XsdSequence[];
+interface XsdElement extends BaseXsdElement {
+    "@_name": string;
+    "@_type"?: string;
+    "@_maxOccurs"?: string;
+    "@_minOccurs"?: string;
+    "@_default"?: string;
+    "@_fixed"?: string;
 }
 
-interface XsdComplexType {
-    '@_name': string;
-    'xsd:sequence'?: XsdSequence[];
-    'xsd:choice'?: XsdChoice[];
+interface XsdSequence extends BaseXsdElement {
+    "xsd:element"?: XsdElement[];
+    "xsd:choice"?: XsdChoice[];
+    "xs:element"?: XsdElement[];
+    "xs:choice"?: XsdChoice[];
 }
 
-interface XsdSchema {
-    '@_targetNamespace'?: string;
-    '@_id'?: string;
-    'xsd:annotation'?: {
-        'xsd:documentation'?: string;
-    };
-    'xsd:complexType': XsdComplexType[] | XsdComplexType;
-    'xsd:simpleType'?: unknown[] | unknown;
-    'xsd:element': XsdElement[] | XsdElement;
-    'xsd:import'?: XsdImport[];
+interface XsdChoice extends BaseXsdElement {
+    "xsd:sequence"?: XsdSequence[];
+    "xs:sequence"?: XsdSequence[];
+    "xsd:element"?: XsdElement[];
+    "xs:element"?: XsdElement[];
+    "@_maxOccurs"?: string;
+}
+
+interface XsdComplexType extends BaseXsdElement {
+    "@_name": string;
+    "xsd:sequence"?: XsdSequence[];
+    "xsd:choice"?: XsdChoice[];
+    "xs:sequence"?: XsdSequence[];
+    "xs:choice"?: XsdChoice[];
+}
+
+interface XsdSchema extends BaseXsdElement {
+    "@_targetNamespace"?: string;
+    "@_id"?: string;
+    "xsd:complexType": XsdComplexType | XsdComplexType[];
+    "xsd:simpleType"?: unknown | unknown[];
+    "xsd:element": XsdElement | XsdElement[];
+    "xsd:import"?: XsdImport[];
+    "xs:complexType"?: XsdComplexType | XsdComplexType[];
+    "xs:simpleType"?: unknown | unknown[];
+    "xs:element"?: XsdElement | XsdElement[];
+    "xs:import"?: XsdImport[];
     [key: string]: any; // Required for detecting xml namespace prefixes
 }
 
 interface XsdObject {
-    'xsd:schema': XsdSchema;
+    "xsd:schema"?: XsdSchema;
+    "xs:schema"?: XsdSchema;
 }
+
+interface ErrorSchemaOptions {
+    errorSchema: Schema;
+    errorStatusCode: number;
+    errorDescription?: string;
+}
+
+type HttpMethods = "get" | "post" | "put" | "delete" | "patch";
 
 export interface XsdToOpenApiConfig {
     inputFilePath?: string;
     outputFilePath?: string;
     schemaName?: string;
     xsdContent?: string;
-    useSchemaNameInPath?: boolean;
-    errorSchema?: Schema;
+    specGenerationOptions?: SpecGeneratorOptions;
 }
 
 /**
@@ -132,200 +162,231 @@ export async function xsdToOpenApi({
     outputFilePath,
     schemaName,
     xsdContent,
-    useSchemaNameInPath = false,
-    errorSchema
+    specGenerationOptions,
 }: XsdToOpenApiConfig) {
     const parser = new XMLParser({
         ignoreAttributes: false,
-        attributeNamePrefix: '@_',
+        attributeNamePrefix: "@_",
         isArray: (name: string): boolean => {
             const arrayElements = [
-                'xsd:element',
-                'xsd:complexType',
-                'xsd:simpleType',
-                'xsd:attribute',
-                'xsd:sequence',
-                'xsd:choice',
-                'xs:element',
-                'xs:complexType',
-                'xs:simpleType',
-                'xs:attribute',
-                'xs:sequence',
-                'xs:choice',
-                'xsd:import',
+                "xsd:element",
+                "xsd:complexType",
+                "xsd:simpleType",
+                "xsd:attribute",
+                "xsd:sequence",
+                "xsd:choice",
+                "xsd:import",
+                "xs:element",
+                "xs:complexType",
+                "xs:simpleType",
+                "xs:attribute",
+                "xs:sequence",
+                "xs:choice",
+                "xs:import",
             ];
             return arrayElements.includes(name);
         },
     });
 
     try {
-        const xsdObj: XsdObject = inputFilePath
-            ? parser.parse(await readFile(inputFilePath, 'utf8'))
-            : parser.parse(xsdContent || '');
-
-        const specName = schemaName || basename(inputFilePath || '', '.xsd');
-
-        if (!xsdObj['xsd:schema']) {
-            throw new Error('Invalid XSD schema: No schema found');
+        if (!inputFilePath && !xsdContent) {
+            throw new Error("An input file path or XSD content must be provided");
         }
 
+        if (inputFilePath && !existsSync(inputFilePath)) {
+            throw new Error("Input file not found");
+        }
+
+        if (!outputFilePath) {
+            throw new Error("Output file path is not specified");
+        }
+
+        const xsdObj: XsdObject = inputFilePath
+            ? parser.parse(await readFile(inputFilePath, "utf8"))
+            : parser.parse(xsdContent || "");
+
+        const xsdSchema = xsdObj["xsd:schema"] || xsdObj["xs:schema"];
+
+        if (!xsdSchema) throw new Error("No XSD schema found");
+
+        const specName = schemaName || basename(inputFilePath as string, ".xsd");
+
         const generatedSpec = await generateOpenApiSpec(
-            xsdObj['xsd:schema'],
+            xsdSchema,
             specName.toLowerCase(),
-            inputFilePath || '',
-            useSchemaNameInPath,
+            inputFilePath as string,
             parser,
-            errorSchema
+            specGenerationOptions || {},
         );
 
         const openapiJson = JSON.stringify(generatedSpec, undefined, 2);
 
-        if (outputFilePath) {
-            if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
+        if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
 
-            await writeFile(outputFilePath, openapiJson, { flag: 'w+' });
-        } else {
-            throw new Error('Output file path is not specified');
-        }
+        await writeFile(outputFilePath, openapiJson, { flag: "w+" });
     } catch (error) {
-        throw new Error(`Error reading XSD file: ${error}`);
+        throw error;
     }
 }
 
 type ImportedSchemasMap = Record<string, XsdSchema>;
 
 function resolveReferencedSchema(
-    schema: XsdSchema,
+    xsdSchema: XsdSchema,
     typeName: string,
     resolvedTypes = new Set<string>(),
+    defaultType: OpenApiType,
     importedSchemas?: ImportedSchemasMap,
 ): Schema {
     if (resolvedTypes.has(typeName)) {
-        return { type: 'object', properties: {} }; // Break circular references
+        return { type: "object", properties: {} }; // Break circular references
     }
 
     resolvedTypes.add(typeName);
-    return generateSchema({ schema, typeName, resolvedTypes, importedSchemas });
+    return generateSchema({ xsdSchema, typeName, resolvedTypes, importedSchemas, defaultType });
 }
 
-function getSequenceElements(complexType: XsdComplexType): XsdElement[] {
-    if (complexType['xsd:sequence']?.[0]) {
-        if (complexType['xsd:sequence'][0]['xsd:choice']?.[0]) {
-            return complexType['xsd:sequence'][0]['xsd:choice']?.[0]?.['xsd:sequence']?.[0]?.['xsd:element'] || [];
-        }
-        return complexType['xsd:sequence'][0]['xsd:element'];
+function getChoiceElements(choice: XsdChoice): XsdElement[] {
+    const nestedSeq = choice["xsd:sequence"]?.[0] || choice["xs:sequence"]?.[0];
+    if (nestedSeq) {
+        return nestedSeq["xsd:element"] || nestedSeq["xs:element"] || [];
+    }
+    return choice["xsd:element"] || choice["xs:element"] || [];
+}
+
+function getSequenceElements(sequence: XsdSequence): XsdElement[] {
+    return sequence["xsd:element"] || sequence["xs:element"] || [];
+}
+
+function addXsdElementToSchema(
+    element: XsdElement,
+    openApiSchema: Schema,
+    xsdSchema: XsdSchema,
+    defaultType: OpenApiType,
+    importedSchemas?: ImportedSchemasMap,
+    resolvedTypes = new Set<string>(),
+) {
+    const subElementName = element["@_name"];
+    const elementMaxOccurs = element["@_maxOccurs"];
+    const { prefix, typeName: elementType } = resolveType(defaultType, element["@_type"]);
+
+    let propertySchema: Schema | SchemaProperty;
+
+    if (prefix && importedSchemas?.[prefix]) {
+        propertySchema = resolveReferencedSchema(
+            importedSchemas[prefix],
+            elementType,
+            resolvedTypes,
+            defaultType,
+            importedSchemas,
+        );
+    } else if (!prefix && elementType) {
+        const formattedElement = elementType.replace("xsd:", "").replace("xs:", "");
+        const mappedElement = openApiTypeMap[formattedElement as OpenApiType];
+        propertySchema = mappedElement
+            ? { type: mappedElement }
+            : resolveReferencedSchema(xsdSchema, elementType, resolvedTypes, defaultType, importedSchemas);
+    } else {
+        propertySchema = { type: defaultType };
     }
 
-    if (complexType['xsd:choice']?.[0]?.['xsd:sequence']?.[0]) {
-        return complexType['xsd:choice'][0]['xsd:sequence'][0]['xsd:element'];
+    const property: SchemaProperty =
+        elementMaxOccurs === "unbounded"
+            ? { type: "array", items: propertySchema }
+            : (propertySchema as SchemaProperty);
+
+    const min = element["@_minOccurs"] || null;
+
+    if (!min || min === "1") {
+        openApiSchema.required = openApiSchema.required || [];
+        if (property.type !== "array") openApiSchema.required.push(subElementName);
     }
 
-    return [];
+    const elementDescription =
+        element["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+        element["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
+
+    if (elementDescription) property.description = elementDescription;
+    if (element["@_default"]) property.default = element["@_default"];
+    if (element["@_fixed"]) property.fixed = element["@_fixed"];
+
+    openApiSchema.properties = openApiSchema.properties || {};
+    openApiSchema.properties[subElementName] = property;
 }
 
 type GenerateSchemaParams = {
-    schema: XsdSchema;
+    xsdSchema: XsdSchema;
     typeName: string;
     resolvedTypes?: Set<string>;
     importedSchemas?: ImportedSchemasMap;
-    errorSchema?: Schema;
+    defaultType: OpenApiType;
 };
 
 function generateSchema({
-    schema,
+    xsdSchema,
     typeName,
     resolvedTypes = new Set<string>(),
     importedSchemas,
-    errorSchema,
+    defaultType,
 }: GenerateSchemaParams) {
-    const complexTypes: XsdComplexType[] = Array.isArray(schema['xsd:complexType'])
-        ? schema['xsd:complexType']
-        : [schema['xsd:complexType']];
+    const rawComplexTypes = xsdSchema["xsd:complexType"] || xsdSchema["xs:complexType"];
 
-    const complexType = complexTypes.find((ct) => ct['@_name'] === typeName);
+    const complexTypes: XsdComplexType[] = Array.isArray(rawComplexTypes)
+        ? rawComplexTypes
+        : [rawComplexTypes].filter((complexType) => complexType);
 
-    // If the complex type is not found, then return an empty schema
+    const complexType = complexTypes.find((ct) => ct["@_name"] === typeName);
+
     if (!complexType) {
-        return { type: 'object', properties: {} };
+        return { type: defaultType };
     }
 
-    const sequenceElements = getSequenceElements(complexType);
+    const sequence = complexType["xsd:sequence"]?.[0] || complexType["xs:sequence"]?.[0];
+    const choice = complexType["xsd:choice"]?.[0] || complexType["xs:choice"]?.[0];
 
-    const schemaType = sequenceElements.length > 0 ? 'object' : 'string'; // Default to string if no elements found
+    const sequenceElements = sequence ? getSequenceElements(sequence) : [];
+    const choiceElements = choice ? getChoiceElements(choice) : [];
 
-    const openApiSchema: Schema = { type: schemaType };
+    if (sequenceElements.length === 0 && choiceElements.length === 0) {
+        return { type: defaultType };
+    }
 
-    sequenceElements.forEach((element: XsdElement) => {
-        const subElementName = element['@_name'];
-        const elementMaxOccurs = element['@_maxOccurs'];
-        const { prefix, typeName: elementType } = resolveType(element);
+    const sequenceSchema = sequenceElements.reduce(
+        (acc, element) => {
+            addXsdElementToSchema(element, acc, xsdSchema, defaultType, importedSchemas, resolvedTypes);
+            return acc;
+        },
+        { type: "object", properties: {} } as Schema,
+    );
 
-        let propertySchema: Schema | SchemaProperty;
+    if (choiceElements.length === 0) {
+        return sequenceSchema;
+    }
 
-        if (prefix && importedSchemas?.[prefix]) {
-            const importedSchema = importedSchemas[prefix];
-            propertySchema = resolveReferencedSchema(importedSchema, elementType, resolvedTypes, importedSchemas);
-        } else if (!prefix && elementType) {
-            const formattedElementType = elementType.replace('xsd:', '').replace('xs:', '');
-            const mappedElementType = openApiTypeMap[formattedElementType as OpenApiType];
+    const choiceType = choice?.["@_maxOccurs"] === "unbounded" ? "anyOf" : "oneOf";
 
-            mappedElementType
-                ? (propertySchema = { type: mappedElementType })
-                : (propertySchema = resolveReferencedSchema(schema, elementType, resolvedTypes, importedSchemas));
-        } else {
-            propertySchema = { type: 'string' }; // Default to string if no type is found
-        }
-
-        const property: SchemaProperty =
-            elementMaxOccurs === 'unbounded'
-                ? {
-                      type: 'array',
-                      items: propertySchema,
-                  }
-                : propertySchema;
-
-        const elementMinOccurs = element['@_minOccurs'] || null;
-        const elementDefault = element['@_default'] || null;
-        const elementFixed = element['@_fixed'] || null;
-        const elementDescription = element['xsd:annotation']?.[0]?.['xsd:documentation'] || null;
-
-        if (!elementMinOccurs || elementMinOccurs === '1') {
-            if (!openApiSchema.required) {
-                openApiSchema.required = [];
-            }
-
-            if (property.type !== 'array') {
-                openApiSchema.required.push(subElementName);
-            }
-        }
-
-        if (elementDefault) property.default = elementDefault;
-        if (elementFixed) property.fixed = elementFixed;
-        if (elementDescription) property.description = elementDescription;
-
-        if (!openApiSchema.properties) {
-            openApiSchema.properties = {};
-        }
-
-        openApiSchema.properties[subElementName] = property;
+    const choiceSchemas = choiceElements.map((element) => {
+        const openApiSchema = { type: "object", properties: {} };
+        addXsdElementToSchema(element, openApiSchema, xsdSchema, defaultType, importedSchemas, resolvedTypes);
+        return openApiSchema;
     });
 
-    return openApiSchema;
+    return { [choiceType]: choiceSchemas };
 }
 
 type NamespacePrefixMap = Map<string, { prefix: string }>;
 
-function extractElementTypePrefixes(schema: XsdSchema) {
+function extractElementTypePrefixes(xsdSchema: XsdSchema) {
     const prefixes: NamespacePrefixMap = new Map();
-    const xmlNamespaceTag = '@_xmlns:';
+    const xmlNamespaceTag = "@_xmlns:";
 
-    Object.keys(schema).forEach((key) => {
+    Object.keys(xsdSchema).forEach((key) => {
         if (key.startsWith(xmlNamespaceTag)) {
             const prefix = key.slice(xmlNamespaceTag.length);
 
             // Avoid adding reserved XML namespace prefixes
-            if (prefix !== 'xsd' && prefix !== 'xs') {
-                prefixes.set(schema[key], { prefix });
+            if (prefix !== "xsd" && prefix !== "xs") {
+                prefixes.set(xsdSchema[key], { prefix });
                 // Key is set to the namespace URI, value is the namsepace prefix
             }
         }
@@ -346,17 +407,17 @@ async function getImportedSchemas(
 
     await Promise.all(
         xsdImports.map(async (xsdImport) => {
-            const namespacePrefix = elementTypePrefixes.get(xsdImport['@_namespace'])?.prefix || '';
+            const namespacePrefix = elementTypePrefixes.get(xsdImport["@_namespace"])?.prefix || "";
 
             if (namespacePrefix) {
-                const importFileName = xsdImport['@_schemaLocation'].endsWith('.xsd')
-                    ? xsdImport['@_schemaLocation']
-                    : `${xsdImport['@_schemaLocation']}.xsd`;
+                const importFileName = xsdImport["@_schemaLocation"].endsWith(".xsd")
+                    ? xsdImport["@_schemaLocation"]
+                    : `${xsdImport["@_schemaLocation"]}.xsd`;
                 const importFilePath = join(dirname(inputFilePath), importFileName);
 
-                const parsedXsd = parser.parse(await readFile(importFilePath, 'utf8'));
+                const parsedXsd = parser.parse(await readFile(importFilePath, "utf8"));
 
-                const importedSchema = parsedXsd['xsd:schema'] || parsedXsd['xs:schema'];
+                const importedSchema = parsedXsd["xsd:schema"] || parsedXsd["xs:schema"];
 
                 if (importedSchema) {
                     importedSchemas[namespacePrefix] = importedSchema;
@@ -370,108 +431,173 @@ async function getImportedSchemas(
     return importedSchemas;
 }
 
-type ResolveTypeResult = { prefix?: string; typeName: string };
+function resolveType(defaultType: OpenApiType, rawType?: XsdElement["@_type"]) {
+    if (!rawType) return { typeName: "string" };
 
-function resolveType(element?: XsdElement): ResolveTypeResult {
-    const rawType = element?.['@_type'];
-
-    if (!rawType) return { typeName: 'string' };
-
-    if (rawType.startsWith('tns:')) {
+    if (rawType.startsWith("tns:")) {
         return { typeName: rawType.slice(4) };
     }
 
-    const typeParts = rawType.split(':');
-    if (typeParts.length === 2 && typeParts[0] !== 'xsd' && typeParts[0] !== 'xs') {
-        return { prefix: typeParts[0], typeName: typeParts[1] || 'string' };
+    const typeParts = rawType.split(":");
+    if (typeParts.length === 2 && typeParts[0] !== "xsd" && typeParts[0] !== "xs") {
+        return { prefix: typeParts[0], typeName: typeParts[1] || defaultType };
     }
 
     return { typeName: rawType };
 }
 
+interface SpecGeneratorOptions {
+    requestSuffix?: string;
+    responseSuffix?: string;
+    useSchemaNameInPath?: boolean;
+    httpMethod?: HttpMethods;
+    openApiVersion?: string;
+    openApiSpecDescription?: string;
+    contentType?: string;
+    defaultType?: OpenApiType;
+    error?: ErrorSchemaOptions;
+}
+
 async function generateOpenApiSpec(
-    schema: XsdObject['xsd:schema'],
+    xsdSchema: XsdSchema,
     schemaName: string,
     inputFilePath: string,
-    useSchemaNameInPath: boolean,
     parser: XMLParser,
-    errorSchema?: Schema,
+    options: SpecGeneratorOptions,
 ) {
+    const {
+        requestSuffix = "Req",
+        responseSuffix = "Res",
+        error,
+        openApiVersion = "3.0.0",
+        httpMethod = "post",
+        contentType = "application/json",
+        defaultType = "string",
+        openApiSpecDescription,
+        useSchemaNameInPath = false,
+    } = options;
+
+    const specDescription =
+        openApiSpecDescription || `OpenAPI ${openApiVersion} specification generated from XSD schema ${schemaName}`;
+
     const openApiSpec: OpenApiSpec = {
-        openapi: '3.1.0',
+        openapi: openApiVersion,
         info: {
             title: schemaName,
-            description: `OpenAPI 3.0 specification generated from XSD schema ${schemaName}`,
-            version: '1.0.0',
+            description: specDescription,
+            version: "1.0.0",
         },
         paths: {},
     };
 
     const importedSchemas = await getImportedSchemas(
-        schema['xsd:import'] || schema['xs:import'],
+        xsdSchema["xsd:import"] || xsdSchema["xs:import"],
         inputFilePath,
         parser,
-        extractElementTypePrefixes(schema),
+        extractElementTypePrefixes(xsdSchema),
     );
 
-    const elements = Array.isArray(schema['xsd:element']) ? schema['xsd:element'] : [schema['xsd:element']];
+    const rawElements = xsdSchema["xsd:element"] || xsdSchema["xs:element"];
 
-    const groupedElements = elements.reduce((acc, element) => {
-        const pathName = element['@_name'].replace('Req', '').replace('Res', '');
-        if (!acc[pathName]) acc[pathName] = {};
-        if (element['@_name'].endsWith('Req')) acc[pathName].request = element;
-        if (element['@_name'].endsWith('Res')) acc[pathName].response = element;
-        return acc;
-    }, {} as Record<string, { request?: XsdElement; response?: XsdElement }>);
+    const validElements = Array.isArray(rawElements) ? rawElements : [rawElements].filter((element) => element);
+
+    const groupedElements = validElements.reduce(
+        (acc, element) => {
+            const elementName = element["@_name"];
+            let pathName = elementName;
+            let isRequest = false;
+            let isResponse = false;
+
+            if (requestSuffix && elementName.endsWith(requestSuffix)) {
+                pathName = elementName.substring(0, elementName.length - requestSuffix.length);
+                isRequest = true;
+            }
+
+            if (responseSuffix && elementName.endsWith(responseSuffix)) {
+                const potentialPathName = elementName.substring(0, elementName.length - responseSuffix.length);
+
+                if (!isRequest || potentialPathName === pathName) {
+                    pathName = potentialPathName;
+                }
+
+                isResponse = true;
+            }
+
+            if (isRequest || isResponse) {
+                if (!acc[pathName]) acc[pathName] = {};
+                if (isRequest) acc[pathName].request = element;
+                if (isResponse) acc[pathName].response = element;
+            }
+
+            return acc;
+        },
+        {} as Record<string, { request?: XsdElement; response?: XsdElement }>,
+    );
 
     Object.entries(groupedElements).forEach(([pathName, { request, response }]) => {
+        if (!request && !response) return;
+
         const openApiPathName = useSchemaNameInPath ? `/${schemaName}/${pathName}` : `/${pathName}`;
 
-        const openApiPath = {
-            post: {
-                summary: `POST ${openApiPathName}`,
-                description: '',
-                requestBody: {
-                    required: true,
-                    content: {
-                        'application/json': {
-                            schema: { type: 'object' },
-                        },
+        const operation: Operation = {
+            operationId: pathName,
+            summary: `${httpMethod.toUpperCase()} ${openApiPathName}`,
+            responses: {},
+        };
+
+        if (request) {
+            const responseDescription =
+                request["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+                request["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
+
+            operation.requestBody = {
+                required: request["@_minOccurs"] !== "0",
+                description: responseDescription,
+                content: {
+                    [contentType]: {
+                        schema: generateSchema({
+                            xsdSchema,
+                            typeName: resolveType(defaultType, request["@_type"]).typeName,
+                            defaultType,
+                            importedSchemas,
+                        }),
                     },
                 },
-                responses: {
-                    '200': {
-                        description: 'OK',
-                        content: {
-                            'application/json': {
-                                schema: { type: 'object' },
-                            },
-                        },
-                    },
-                    '500': {
-                        description: 'Internal server error',
-                        content: {
-                            'application/json': {
-                                schema: errorSchema || { type: 'object' },
-                            },
-                        },
+            };
+        }
+
+        if (response) {
+            const responseDescription =
+                response["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+                response["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
+
+            operation.responses["200"] = {
+                description: responseDescription,
+                content: {
+                    [contentType]: {
+                        schema: generateSchema({
+                            xsdSchema,
+                            typeName: resolveType(defaultType, response["@_type"]).typeName,
+                            defaultType,
+                            importedSchemas,
+                        }),
                     },
                 },
-            },
-        } satisfies PathItem;
+            };
+        }
 
-        openApiPath.post.requestBody.content['application/json'].schema = generateSchema({
-            schema,
-            typeName: resolveType(request).typeName,
-            importedSchemas,
-        });
-        openApiPath.post.responses['200'].content['application/json'].schema = generateSchema({
-            schema,
-            typeName: resolveType(response).typeName,
-            importedSchemas,
-        });
+        if (error) {
+            operation.responses[error.errorStatusCode] = {
+                description: error.errorDescription,
+                content: {
+                    [contentType]: {
+                        schema: error.errorSchema,
+                    },
+                },
+            };
+        }
 
-        openApiSpec.paths[openApiPathName] = openApiPath;
+        openApiSpec.paths[openApiPathName] = { [httpMethod]: operation };
     });
 
     return openApiSpec;

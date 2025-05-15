@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://example.com/bookservice"
+    targetNamespace="http://example.com/bookservice"
+    elementFormDefault="qualified">
+
+    <!-- Request -->
+    <xs:element name="GetBookRequest" type="tns:tGetBookRequest" />
+    <xs:complexType name="tGetBookRequest">
+        <xs:sequence>
+            <xs:element name="bookId" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Response -->
+    <xs:element name="GetBookResponse" type="tns:tGetBookResponse" />
+    <xs:complexType name="tGetBookResponse">
+        <xs:sequence>
+            <xs:element name="Book" type="tns:BookType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Book Type -->
+    <xs:complexType name="BookType">
+        <xs:sequence>
+            <xs:element name="ID" type="xs:string" />
+            <xs:element name="Title" type="xs:string" />
+            <xs:element name="Author" type="xs:string" />
+            <xs:element name="PublishedYear" type="xs:gYear" />
+            <xs:element name="ISBN" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>

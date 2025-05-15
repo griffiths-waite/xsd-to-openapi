@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <xsd:element name="TestReq" type="tTestReq"/>
+    <xsd:complexType name="tTestReq">
+        <xsd:sequence>
+            <xsd:element name="stringField" type="xsd:string"/>
+            <xsd:element name="numberField" type="xsd:decimal"/>
+        </xsd:sequence>
+    </xsd:complexType>
+</xsd:schema>

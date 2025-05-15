@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:po="http://example.com/purchase-order"
+    targetNamespace="http://example.com/purchase-order"
+    xmlns="http://example.com/purchase-order"
+    elementFormDefault="qualified">
+
+    <!-- Root element -->
+    <xs:element name="PurchaseOrder" type="PurchaseOrderRequestType" />
+
+    <!-- Complex types -->
+    <xs:complexType name="PurchaseOrderRequestType">
+        <xs:sequence>
+            <xs:element name="OrderID" type="xs:string" />
+            <xs:element name="OrderDate" type="xs:date" />
+            <xs:element name="Customer" type="po:CustomerType" />
+            <xs:element name="Items" type="po:ItemsType" />
+            <xs:element name="Comments" type="xs:string" minOccurs="0" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="CustomerType">
+        <xs:sequence>
+            <xs:element name="CustomerID" type="xs:string" />
+            <xs:element name="Name" type="xs:string" />
+            <xs:element name="Address" type="po:AddressType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="AddressType">
+        <xs:sequence>
+            <xs:element name="Street" type="xs:string" />
+            <xs:element name="City" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ItemsType">
+        <xs:sequence>
+            <xs:element name="Item" type="po:ItemType" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ItemType">
+        <xs:sequence>
+            <xs:element name="ItemID" type="xs:string" />
+            <xs:element name="Quantity" type="xs:integer" />
+            <xs:element name="Price" type="xs:decimal" />
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>
