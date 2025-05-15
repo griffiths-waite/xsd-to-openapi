@@ -66,27 +66,6 @@ describe("XSD to OpenAPI Converter", () => {
         });
     });
 
-    it("should throw error if no schema is found when providing XSD content as a file", async () => {
-        const inputFilePath = path.join(fixturesDir, "no-schema-found.xsd");
-        const outputFilePath = path.join(outputDir, "no-schema-found.json");
-
-        await expect(
-            xsdToOpenApi({
-                inputFilePath,
-                outputFilePath,
-            }),
-        ).rejects.toThrowError("Invalid XSD schema: No schema found");
-    });
-
-    it("should throw error if no schema is found when providing XSD content as a string", async () => {
-        await expect(
-            xsdToOpenApi({
-                xsdContent: "invalid content",
-                outputFilePath: path.join(outputDir, "invalid.json"),
-            }),
-        ).rejects.toThrowError("Invalid XSD schema: No schema found");
-    });
-
     it("should convert an XSD schema with complex types", async () => {
         const inputFilePath = path.join(fixturesDir, "complex-types.xsd");
         const outputFilePath = path.join(outputDir, "complex-types.json");
@@ -377,24 +356,70 @@ describe("XSD to OpenAPI Converter", () => {
         );
     });
 
-    it("should handle XSD schemas with no elements", async () => {
+    it("should handle an XSD schema with no elements", async () => {
         const inputFilePath = path.join(fixturesDir, "no-elements.xsd");
         const outputFilePath = path.join(outputDir, "no-elements.json");
 
         await xsdToOpenApi({
             inputFilePath,
             outputFilePath,
-            schemaName: "api",
             specGenerationOptions: {
-                useSchemaNameInPath: true,
+                useSchemaNameInPath: false,
             },
         });
 
         const result = require(outputFilePath);
-        expect(result.paths["/api/NoElements"]).toBeDefined();
-        expect(result.paths["/api/NoElements"].post.requestBody).toBeDefined();
-        expect(result.paths["/api/NoElements"].post.requestBody.content["application/json"].schema).toMatchObject({
+        expect(result.paths["/NoElements"]).toBeDefined();
+        expect(result.paths["/NoElements"].post.requestBody).toBeDefined();
+        expect(result.paths["/NoElements"].post.requestBody.content["application/json"].schema).toMatchObject({
             type: "string",
         });
+    });
+
+    it("should throw an error if no schema is found when providing XSD content as a file", async () => {
+        const inputFilePath = path.join(fixturesDir, "no-schema-found.xsd");
+        const outputFilePath = path.join(outputDir, "no-schema-found.json");
+
+        await expect(
+            xsdToOpenApi({
+                inputFilePath,
+                outputFilePath,
+            }),
+        ).rejects.toThrowError("No XSD schema found");
+    });
+
+    it("should throw an error if no schema is found when providing XSD content as a string", async () => {
+        await expect(
+            xsdToOpenApi({
+                xsdContent: "invalid content",
+                outputFilePath: path.join(outputDir, "invalid.json"),
+            }),
+        ).rejects.toThrowError("No XSD schema found");
+    });
+
+    it("should throw an error if nothing is passed in", async () => {
+        await expect(xsdToOpenApi({})).rejects.toThrowError("An input file path or XSD content must be provided");
+    });
+
+    it("should throw an error if the input file does not exist", async () => {
+        const inputFilePath = path.join(fixturesDir, "nonexistent.xsd");
+        const outputFilePath = path.join(outputDir, "nonexistent.json");
+
+        await expect(
+            xsdToOpenApi({
+                inputFilePath,
+                outputFilePath,
+            }),
+        ).rejects.toThrowError("Input file not found");
+    });
+
+    it("should throw an error if no output file path is specified", async () => {
+        const inputFilePath = path.join(fixturesDir, "basic.xsd");
+
+        await expect(
+            xsdToOpenApi({
+                inputFilePath,
+            }),
+        ).rejects.toThrowError("Output file path is not specified");
     });
 });
