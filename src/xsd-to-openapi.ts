@@ -49,11 +49,15 @@ interface Schema {
 }
 
 interface Operation {
-    summary: string;
+    operationId?: string;
+    tags?: string[];
+    summary?: string;
     description?: string;
+    deprecated?: boolean;
     requestBody?: {
         required: boolean;
         content: Record<string, { schema: Schema }>;
+        description?: string;
     };
     responses: Record<
         string,
@@ -528,13 +532,19 @@ async function generateOpenApiSpec(
         const openApiPathName = useSchemaNameInPath ? `/${schemaName}/${pathName}` : `/${pathName}`;
 
         const operation: Operation = {
+            operationId: pathName,
             summary: `${httpMethod.toUpperCase()} ${openApiPathName}`,
             responses: {},
         };
 
         if (request) {
+            const responseDescription =
+                request["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+                request["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
+
             operation.requestBody = {
                 required: request["@_minOccurs"] !== "0",
+                description: responseDescription,
                 content: {
                     [contentType]: {
                         schema: generateSchema({
