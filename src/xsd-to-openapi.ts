@@ -148,7 +148,7 @@ type HttpMethods = "get" | "post" | "put" | "delete" | "patch";
 
 export interface XsdToOpenApiConfig {
     inputFilePath?: string;
-    outputFilePath: string;
+    outputFilePath?: string;
     schemaName?: string;
     xsdContent?: string;
     specGenerationOptions?: SpecGeneratorOptions;
@@ -239,9 +239,11 @@ export async function xsdToOpenApi({
 
         const openApiSpec = JSON.stringify(generatedSpec, undefined, 2);
 
-        if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
+        if (outputFilePath) {
+            if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
 
-        await writeFile(outputFilePath, openApiSpec, { flag: "w+" });
+            await writeFile(outputFilePath, openApiSpec, { flag: "w+" });
+        }
 
         return generatedSpec;
     } catch (error) {
