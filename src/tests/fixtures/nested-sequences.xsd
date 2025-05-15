@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <!-- UpdateInventory Operation -->
+    <xs:element name="UpdateInventoryRequest" type="UpdateInventoryRequestType" />
+    <xs:element name="UpdateInventoryResponse" type="UpdateInventoryResponseType" />
+
+    <xs:complexType name="UpdateInventoryRequestType">
+        <xs:sequence>
+            <xs:element name="ProductID" type="xs:string" />
+            <xs:sequence>
+                <xs:element name="Quantity" type="xs:int" />
+                <xs:element name="Location" type="xs:string" />
+            </xs:sequence>
+            <xs:element name="RequestedBy" type="xs:string" minOccurs="0" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="UpdateInventoryResponseType">
+        <xs:sequence>
+            <xs:element name="InventoryStatus" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>
