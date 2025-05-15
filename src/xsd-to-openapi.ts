@@ -42,10 +42,12 @@ interface SchemaProperty {
 }
 
 interface Schema {
-    type: string;
+    type?: string;
     properties?: Record<string, SchemaProperty>;
     required?: string[];
     items?: Schema;
+    oneOf?: Schema[];
+    anyOf?: Schema[];
 }
 
 interface Operation {
@@ -106,6 +108,7 @@ interface XsdChoice extends BaseXsdElement {
     "xs:sequence"?: XsdSequence[];
     "xsd:element"?: XsdElement[];
     "xs:element"?: XsdElement[];
+    "@_maxOccurs"?: string;
 }
 
 interface XsdComplexType extends BaseXsdElement {
@@ -229,7 +232,7 @@ export async function xsdToOpenApi({
 type ImportedSchemasMap = Record<string, XsdSchema>;
 
 function resolveReferencedSchema(
-    schema: XsdSchema,
+    xsdSchema: XsdSchema,
     typeName: string,
     resolvedTypes = new Set<string>(),
     defaultType: OpenApiType,
@@ -240,40 +243,79 @@ function resolveReferencedSchema(
     }
 
     resolvedTypes.add(typeName);
-    return generateSchema({ schema, typeName, resolvedTypes, importedSchemas, defaultType });
+    return generateSchema({ xsdSchema, typeName, resolvedTypes, importedSchemas, defaultType });
 }
 
-function getElements(complexType: XsdComplexType): XsdElement[] {
-    const sequence = complexType["xsd:sequence"]?.[0] || complexType["xs:sequence"]?.[0];
+function getChoiceElements(choice: XsdChoice): XsdElement[] {
+    const nestedSeq = choice["xsd:sequence"]?.[0] || choice["xs:sequence"]?.[0];
+    if (nestedSeq) {
+        return nestedSeq["xsd:element"] || nestedSeq["xs:element"] || [];
+    }
+    return choice["xsd:element"] || choice["xs:element"] || [];
+}
 
-    if (sequence) {
-        const innerChoice = sequence["xsd:choice"]?.[0] || sequence["xs:choice"]?.[0];
+function getSequenceElements(sequence: XsdSequence): XsdElement[] {
+    return sequence["xsd:element"] || sequence["xs:element"] || [];
+}
 
-        if (innerChoice) {
-            const innerSequenceElements =
-                innerChoice["xsd:sequence"]?.[0]["xsd:element"] || innerChoice["xs:sequence"]?.[0]["xs:element"];
+function addXsdElementToSchema(
+    element: XsdElement,
+    openApiSchema: Schema,
+    xsdSchema: XsdSchema,
+    defaultType: OpenApiType,
+    importedSchemas?: ImportedSchemasMap,
+    resolvedTypes = new Set<string>(),
+) {
+    const subElementName = element["@_name"];
+    const elementMaxOccurs = element["@_maxOccurs"];
+    const { prefix, typeName: elementType } = resolveType(defaultType, element["@_type"]);
 
-            return innerSequenceElements || [];
-        }
+    let propertySchema: Schema | SchemaProperty;
 
-        return sequence["xsd:element"] || sequence["xs:element"] || [];
+    if (prefix && importedSchemas?.[prefix]) {
+        propertySchema = resolveReferencedSchema(
+            importedSchemas[prefix],
+            elementType,
+            resolvedTypes,
+            defaultType,
+            importedSchemas,
+        );
+    } else if (!prefix && elementType) {
+        const formattedElement = elementType.replace("xsd:", "").replace("xs:", "");
+        const mappedElement = openApiTypeMap[formattedElement as OpenApiType];
+        propertySchema = mappedElement
+            ? { type: mappedElement }
+            : resolveReferencedSchema(xsdSchema, elementType, resolvedTypes, defaultType, importedSchemas);
+    } else {
+        propertySchema = { type: defaultType };
     }
 
-    const choice = complexType["xsd:choice"]?.[0] || complexType["xs:choice"]?.[0];
+    const property: SchemaProperty =
+        elementMaxOccurs === "unbounded"
+            ? { type: "array", items: propertySchema }
+            : (propertySchema as SchemaProperty);
 
-    if (choice) {
-        const innerSequenceElements =
-            choice["xsd:sequence"]?.[0]["xsd:element"] || choice["xs:sequence"]?.[0]["xs:element"];
-        const choiceElements = choice["xsd:element"] || choice["xs:element"] || [];
+    const min = element["@_minOccurs"] || null;
 
-        return innerSequenceElements || choiceElements || [];
+    if (!min || min === "1") {
+        openApiSchema.required = openApiSchema.required || [];
+        if (property.type !== "array") openApiSchema.required.push(subElementName);
     }
 
-    return [];
+    const elementDescription =
+        element["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
+        element["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
+
+    if (elementDescription) property.description = elementDescription;
+    if (element["@_default"]) property.default = element["@_default"];
+    if (element["@_fixed"]) property.fixed = element["@_fixed"];
+
+    openApiSchema.properties = openApiSchema.properties || {};
+    openApiSchema.properties[subElementName] = property;
 }
 
 type GenerateSchemaParams = {
-    schema: XsdSchema;
+    xsdSchema: XsdSchema;
     typeName: string;
     resolvedTypes?: Set<string>;
     importedSchemas?: ImportedSchemasMap;
@@ -281,13 +323,13 @@ type GenerateSchemaParams = {
 };
 
 function generateSchema({
-    schema,
+    xsdSchema,
     typeName,
     resolvedTypes = new Set<string>(),
     importedSchemas,
     defaultType,
 }: GenerateSchemaParams) {
-    const rawComplexTypes = schema["xsd:complexType"] || schema["xs:complexType"];
+    const rawComplexTypes = xsdSchema["xsd:complexType"] || xsdSchema["xs:complexType"];
 
     const complexTypes: XsdComplexType[] = Array.isArray(rawComplexTypes)
         ? rawComplexTypes
@@ -299,97 +341,52 @@ function generateSchema({
         return { type: defaultType };
     }
 
-    const sequenceElements = getElements(complexType);
+    const sequence = complexType["xsd:sequence"]?.[0] || complexType["xs:sequence"]?.[0];
+    const choice = complexType["xsd:choice"]?.[0] || complexType["xs:choice"]?.[0];
 
-    const schemaType = sequenceElements.length > 0 ? "object" : defaultType; // Use defaultType if no elements are found
+    const sequenceElements = sequence ? getSequenceElements(sequence) : [];
+    const choiceElements = choice ? getChoiceElements(choice) : [];
 
-    const openApiSchema: Schema = { type: schemaType };
+    if (sequenceElements.length === 0 && choiceElements.length === 0) {
+        return { type: defaultType };
+    }
 
-    sequenceElements.forEach((element: XsdElement) => {
-        const subElementName = element["@_name"];
-        const elementMaxOccurs = element["@_maxOccurs"];
-        const { prefix, typeName: elementType } = resolveType(defaultType, element["@_type"]);
+    const sequenceSchema = sequenceElements.reduce(
+        (acc, element) => {
+            addXsdElementToSchema(element, acc, xsdSchema, defaultType, importedSchemas, resolvedTypes);
+            return acc;
+        },
+        { type: "object", properties: {} } as Schema,
+    );
 
-        let propertySchema: Schema | SchemaProperty;
+    if (choiceElements.length === 0) {
+        return sequenceSchema;
+    }
 
-        if (prefix && importedSchemas?.[prefix]) {
-            const importedSchema = importedSchemas[prefix];
-            propertySchema = resolveReferencedSchema(
-                importedSchema,
-                elementType,
-                resolvedTypes,
-                defaultType,
-                importedSchemas,
-            );
-        } else if (!prefix && elementType) {
-            const formattedElementType = elementType.replace("xsd:", "").replace("xs:", "");
-            const mappedElementType = openApiTypeMap[formattedElementType as OpenApiType];
+    const choiceType = choice?.["@_maxOccurs"] === "unbounded" ? "anyOf" : "oneOf";
 
-            mappedElementType
-                ? (propertySchema = { type: mappedElementType })
-                : (propertySchema = resolveReferencedSchema(
-                      schema,
-                      elementType,
-                      resolvedTypes,
-                      defaultType,
-                      importedSchemas,
-                  ));
-        } else {
-            propertySchema = { type: defaultType }; // Use defaultType if no type is found
-        }
-
-        const property: SchemaProperty =
-            elementMaxOccurs === "unbounded"
-                ? {
-                      type: "array",
-                      items: propertySchema,
-                  }
-                : propertySchema;
-
-        const elementMinOccurs = element["@_minOccurs"] || null;
-        const elementDefault = element["@_default"] || null;
-        const elementFixed = element["@_fixed"] || null;
-        const elementDescription =
-            element["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
-            element["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
-
-        if (!elementMinOccurs || elementMinOccurs === "1") {
-            if (!openApiSchema.required) {
-                openApiSchema.required = [];
-            }
-
-            if (property.type !== "array") {
-                openApiSchema.required.push(subElementName);
-            }
-        }
-
-        if (elementDefault) property.default = elementDefault;
-        if (elementFixed) property.fixed = elementFixed;
-        if (elementDescription) property.description = elementDescription;
-
-        if (!openApiSchema.properties) {
-            openApiSchema.properties = {};
-        }
-
-        openApiSchema.properties[subElementName] = property;
+    const choiceSchemas = choiceElements.map((element) => {
+        const openApiSchema = { type: "object", properties: {} };
+        addXsdElementToSchema(element, openApiSchema, xsdSchema, defaultType, importedSchemas, resolvedTypes);
+        return openApiSchema;
     });
 
-    return openApiSchema;
+    return { [choiceType]: choiceSchemas };
 }
 
 type NamespacePrefixMap = Map<string, { prefix: string }>;
 
-function extractElementTypePrefixes(schema: XsdSchema) {
+function extractElementTypePrefixes(xsdSchema: XsdSchema) {
     const prefixes: NamespacePrefixMap = new Map();
     const xmlNamespaceTag = "@_xmlns:";
 
-    Object.keys(schema).forEach((key) => {
+    Object.keys(xsdSchema).forEach((key) => {
         if (key.startsWith(xmlNamespaceTag)) {
             const prefix = key.slice(xmlNamespaceTag.length);
 
             // Avoid adding reserved XML namespace prefixes
             if (prefix !== "xsd" && prefix !== "xs") {
-                prefixes.set(schema[key], { prefix });
+                prefixes.set(xsdSchema[key], { prefix });
                 // Key is set to the namespace URI, value is the namsepace prefix
             }
         }
@@ -462,7 +459,7 @@ interface SpecGeneratorOptions {
 }
 
 async function generateOpenApiSpec(
-    schema: XsdSchema,
+    xsdSchema: XsdSchema,
     schemaName: string,
     inputFilePath: string,
     parser: XMLParser,
@@ -494,13 +491,13 @@ async function generateOpenApiSpec(
     };
 
     const importedSchemas = await getImportedSchemas(
-        schema["xsd:import"] || schema["xs:import"],
+        xsdSchema["xsd:import"] || xsdSchema["xs:import"],
         inputFilePath,
         parser,
-        extractElementTypePrefixes(schema),
+        extractElementTypePrefixes(xsdSchema),
     );
 
-    const rawElements = schema["xsd:element"] || schema["xs:element"];
+    const rawElements = xsdSchema["xsd:element"] || xsdSchema["xs:element"];
 
     const validElements = Array.isArray(rawElements) ? rawElements : [rawElements].filter((element) => element);
 
@@ -559,7 +556,7 @@ async function generateOpenApiSpec(
                 content: {
                     [contentType]: {
                         schema: generateSchema({
-                            schema,
+                            xsdSchema,
                             typeName: resolveType(defaultType, request["@_type"]).typeName,
                             defaultType,
                             importedSchemas,
@@ -579,7 +576,7 @@ async function generateOpenApiSpec(
                 content: {
                     [contentType]: {
                         schema: generateSchema({
-                            schema,
+                            xsdSchema,
                             typeName: resolveType(defaultType, response["@_type"]).typeName,
                             defaultType,
                             importedSchemas,
