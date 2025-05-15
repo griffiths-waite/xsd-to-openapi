@@ -104,6 +104,8 @@ interface XsdSequence extends BaseXsdElement {
 interface XsdChoice extends BaseXsdElement {
     "xsd:sequence"?: XsdSequence[];
     "xs:sequence"?: XsdSequence[];
+    "xsd:element"?: XsdElement[];
+    "xs:element"?: XsdElement[];
 }
 
 interface XsdComplexType extends BaseXsdElement {
@@ -184,33 +186,41 @@ export async function xsdToOpenApi({
     });
 
     try {
+        if (!inputFilePath && !xsdContent) {
+            throw new Error("An input file path or XSD content must be provided");
+        }
+
+        if (inputFilePath && !existsSync(inputFilePath)) {
+            throw new Error("Input file not found");
+        }
+
+        if (!outputFilePath) {
+            throw new Error("Output file path is not specified");
+        }
+
         const xsdObj: XsdObject = inputFilePath
             ? parser.parse(await readFile(inputFilePath, "utf8"))
-            : parser.parse(xsdContent as string);
+            : parser.parse(xsdContent || "");
 
         const xsdSchema = xsdObj["xsd:schema"] || xsdObj["xs:schema"];
 
-        if (!xsdSchema) throw new Error("Invalid XSD schema: No schema found");
+        if (!xsdSchema) throw new Error("No XSD schema found");
 
-        const specName = schemaName || basename(inputFilePath || "", ".xsd");
+        const specName = schemaName || basename(inputFilePath as string, ".xsd");
 
         const generatedSpec = await generateOpenApiSpec(
             xsdSchema,
             specName.toLowerCase(),
-            inputFilePath || "",
+            inputFilePath as string,
             parser,
             specGenerationOptions || {},
         );
 
         const openapiJson = JSON.stringify(generatedSpec, undefined, 2);
 
-        if (outputFilePath) {
-            if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
+        if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
 
-            await writeFile(outputFilePath, openapiJson, { flag: "w+" });
-        } else {
-            throw new Error("Output file path is not specified");
-        }
+        await writeFile(outputFilePath, openapiJson, { flag: "w+" });
     } catch (error) {
         throw error;
     }
@@ -233,7 +243,7 @@ function resolveReferencedSchema(
     return generateSchema({ schema, typeName, resolvedTypes, importedSchemas, defaultType });
 }
 
-function getSequenceElements(complexType: XsdComplexType): XsdElement[] {
+function getElements(complexType: XsdComplexType): XsdElement[] {
     const sequence = complexType["xsd:sequence"]?.[0] || complexType["xs:sequence"]?.[0];
 
     if (sequence) {
@@ -254,8 +264,9 @@ function getSequenceElements(complexType: XsdComplexType): XsdElement[] {
     if (choice) {
         const innerSequenceElements =
             choice["xsd:sequence"]?.[0]["xsd:element"] || choice["xs:sequence"]?.[0]["xs:element"];
+        const choiceElements = choice["xsd:element"] || choice["xs:element"] || [];
 
-        return innerSequenceElements || [];
+        return innerSequenceElements || choiceElements || [];
     }
 
     return [];
@@ -288,7 +299,7 @@ function generateSchema({
         return { type: defaultType };
     }
 
-    const sequenceElements = getSequenceElements(complexType);
+    const sequenceElements = getElements(complexType);
 
     const schemaType = sequenceElements.length > 0 ? "object" : defaultType; // Use defaultType if no elements are found
 
