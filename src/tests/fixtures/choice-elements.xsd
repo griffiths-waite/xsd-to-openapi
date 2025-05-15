@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <!-- GetUserDetails Operation -->
+    <xs:element name="GetUserDetailsRequest" type="GetUserDetailsRequestType" />
+    <xs:element name="GetUserDetailsResponse" type="GetUserDetailsResponseType" />
+
+    <!-- CreateOrder Operation -->
+    <xs:element name="CreateOrderRequest" type="CreateOrderRequestType" />
+    <xs:element name="CreateOrderResponse" type="CreateOrderResponseType" />
+
+    <!-- UpdateInventory Operation -->
+    <xs:element name="UpdateInventoryRequest" type="UpdateInventoryRequestType" />
+    <xs:element name="UpdateInventoryResponse" type="UpdateInventoryResponseType" />
+
+    <!-- Complex Types -->
+    <xs:complexType name="GetUserDetailsRequestType">
+        <xs:sequence>
+            <xs:element name="UserID" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="GetUserDetailsResponseType">
+        <xs:sequence>
+            <xs:element name="UserDetails" type="UserDetailsType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="CreateOrderRequestType">
+        <xs:sequence>
+            <xs:element name="OrderID" type="xs:string" />
+            <xs:element name="OrderDetails" type="OrderDetailsType" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="CreateOrderResponseType">
+        <xs:sequence>
+            <xs:element name="OrderStatus" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="UpdateInventoryRequestType">
+        <xs:sequence>
+            <xs:element name="ProductID" type="xs:string" />
+            <xs:element name="Quantity" type="xs:int" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="UpdateInventoryResponseType">
+        <xs:sequence>
+            <xs:element name="InventoryStatus" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Complex Types with Choice Elements -->
+    <xs:complexType name="UserDetailsType">
+        <xs:choice>
+            <xs:element name="Name" type="xs:string" />
+            <xs:element name="Email" type="xs:string" />
+            <xs:element name="PhoneNumber" type="xs:string" />
+        </xs:choice>
+    </xs:complexType>
+
+    <xs:complexType name="OrderDetailsType">
+        <xs:choice>
+            <xs:element name="ProductID" type="xs:string" />
+            <xs:element name="ProductName" type="xs:string" />
+            <xs:element name="ProductDescription" type="xs:string" />
+        </xs:choice>
+    </xs:complexType>
+
+</xs:schema>

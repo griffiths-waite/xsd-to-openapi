@@ -376,6 +376,24 @@ describe("XSD to OpenAPI Converter", () => {
         });
     });
 
+        it("should handle an XSD schema with choice elements", async () => {
+        const inputFilePath = path.join(fixturesDir, "choice-elements.xsd");
+        const outputFilePath = path.join(outputDir, "choice-elements.json");
+
+        await xsdToOpenApi({
+            inputFilePath,
+            outputFilePath,
+            specGenerationOptions: {
+                requestSuffix: "Request",
+                responseSuffix: "Response",
+                useSchemaNameInPath: false,
+            },
+        });
+
+        const result = require(outputFilePath);
+        expect(result.paths["/GetUserDetails"]).toBeDefined();
+    });
+
     it("should throw an error if no schema is found when providing XSD content as a file", async () => {
         const inputFilePath = path.join(fixturesDir, "no-schema-found.xsd");
         const outputFilePath = path.join(outputDir, "no-schema-found.json");
