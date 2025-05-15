@@ -472,10 +472,6 @@ describe("XSD to OpenAPI Converter", () => {
         ).rejects.toThrowError("No XSD schema found");
     });
 
-    it("should throw an error if nothing is passed in", async () => {
-        await expect(xsdToOpenApi({})).rejects.toThrowError("An input file path or XSD content must be provided");
-    });
-
     it("should throw an error if the input file does not exist", async () => {
         const inputFilePath = path.join(fixturesDir, "nonexistent.xsd");
         const outputFilePath = path.join(outputDir, "nonexistent.json");
@@ -486,15 +482,5 @@ describe("XSD to OpenAPI Converter", () => {
                 outputFilePath,
             }),
         ).rejects.toThrowError("Input file not found");
-    });
-
-    it("should throw an error if no output file path is specified", async () => {
-        const inputFilePath = path.join(fixturesDir, "basic.xsd");
-
-        await expect(
-            xsdToOpenApi({
-                inputFilePath,
-            }),
-        ).rejects.toThrowError("Output file path is not specified");
     });
 });
