@@ -148,20 +148,42 @@ type HttpMethods = "get" | "post" | "put" | "delete" | "patch";
 
 export interface XsdToOpenApiConfig {
     inputFilePath?: string;
-    outputFilePath?: string;
+    outputFilePath: string;
     schemaName?: string;
     xsdContent?: string;
     specGenerationOptions?: SpecGeneratorOptions;
 }
 
 /**
- * Converts XSD schema to OpenAPI3.0 specification
+ * Convert an XSD schema (either from a file or a string) into an OpenAPI 3.0 spec
+ * and receive the OpenAPI spec as a JSON file.
+ *
+ * @returns The generated OpenAPI spec as a JSON object (for programmatic use).
+ *
+ * @param inputFilePath - Path to the input XSD file. If not provided, xsdContent must be provided.
+ * @param outputFilePath - Path to the output OpenAPI JSON file.
+ * @param xsdContent - Optional XSD content as a string. If provided, inputFilePath is ignored.
+ * @param schemaName - Optional name for the schema. If not provided, it will be derived from the input file name.
+ * @param specGenerationOptions - Options for generating the OpenAPI spec.
+ * @param specGenerationOptions.requestSuffix - Suffix for request elements. Default is "Req".
+ * @param specGenerationOptions.responseSuffix - Suffix for response elements. Default is "Res".
+ * @param specGenerationOptions.useSchemaNameInPath - Whether to use the schema name in the path. Default is false.
+ * @param specGenerationOptions.httpMethod - HTTP method for the operation. Default is "post".
+ * @param specGenerationOptions.openApiVersion - OpenAPI version. Default is "3.0.0".
+ * @param specGenerationOptions.openApiSpecDescription - Description for the OpenAPI spec.
+ * @param specGenerationOptions.contentType - Content type for the request and response. Default is "application/json".
+ * @param specGenerationOptions.defaultType - Default type for elements. Default is "string".
+ * @param specGenerationOptions.error - Error schema options.
+ * @param specGenerationOptions.error.errorSchema - JSON Schema for the error response.
+ * @param specGenerationOptions.error.errorStatusCode - HTTP status code for the error response.
+ * @param specGenerationOptions.error.errorDescription - Description for the error response.
+ *
  */
 export async function xsdToOpenApi({
     inputFilePath,
     outputFilePath,
-    schemaName,
     xsdContent,
+    schemaName,
     specGenerationOptions,
 }: XsdToOpenApiConfig) {
     const parser = new XMLParser({
@@ -197,10 +219,6 @@ export async function xsdToOpenApi({
             throw new Error("Input file not found");
         }
 
-        if (!outputFilePath) {
-            throw new Error("Output file path is not specified");
-        }
-
         const xsdObj: XsdObject = inputFilePath
             ? parser.parse(await readFile(inputFilePath, "utf8"))
             : parser.parse(xsdContent || "");
@@ -219,11 +237,13 @@ export async function xsdToOpenApi({
             specGenerationOptions || {},
         );
 
-        const openapiJson = JSON.stringify(generatedSpec, undefined, 2);
+        const openApiSpec = JSON.stringify(generatedSpec, undefined, 2);
 
         if (!existsSync(outputFilePath)) await mkdir(dirname(outputFilePath), { recursive: true });
 
-        await writeFile(outputFilePath, openapiJson, { flag: "w+" });
+        await writeFile(outputFilePath, openApiSpec, { flag: "w+" });
+
+        return generatedSpec;
     } catch (error) {
         throw error;
     }
