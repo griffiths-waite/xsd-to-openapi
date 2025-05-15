@@ -376,7 +376,7 @@ describe("XSD to OpenAPI Converter", () => {
         });
     });
 
-        it("should handle an XSD schema with choice elements", async () => {
+    it("should handle an XSD schema with choice elements", async () => {
         const inputFilePath = path.join(fixturesDir, "choice-elements.xsd");
         const outputFilePath = path.join(outputDir, "choice-elements.json");
 
@@ -392,6 +392,63 @@ describe("XSD to OpenAPI Converter", () => {
 
         const result = require(outputFilePath);
         expect(result.paths["/GetUserDetails"]).toBeDefined();
+        expect(result.paths["/GetUserDetails"].post.responses[200]).toBeDefined();
+        expect(result.paths["/GetUserDetails"].post.responses[200].content["application/json"].schema).toMatchObject({
+            type: "object",
+            properties: {
+                UserDetails: {
+                    oneOf: [
+                        {
+                            type: "object",
+                            properties: {
+                                Name: {
+                                    type: "string",
+                                },
+                            },
+                            required: ["Name"],
+                        },
+                        {
+                            type: "object",
+                            properties: {
+                                Email: {
+                                    type: "string",
+                                },
+                            },
+                            required: ["Email"],
+                        },
+                        {
+                            type: "object",
+                            properties: {
+                                PhoneNumber: {
+                                    type: "string",
+                                },
+                            },
+                            required: ["PhoneNumber"],
+                        },
+                    ],
+                },
+            },
+            required: ["UserDetails"],
+        });
+    });
+
+    it("should handle an XSD schema with choice elements in sequences", async () => {
+        const inputFilePath = path.join(fixturesDir, "choice-elements.xsd");
+        const outputFilePath = path.join(outputDir, "choice-elements.json");
+
+        await xsdToOpenApi({
+            inputFilePath,
+            outputFilePath,
+            specGenerationOptions: {
+                requestSuffix: "Request",
+                responseSuffix: "Response",
+                useSchemaNameInPath: false,
+            },
+        });
+
+        const result = require(outputFilePath);
+        expect(result.paths["/ProcessPayment"]).toBeDefined();
+        expect(result.paths["/ProcessPayment"].post.requestBody).toBeDefined();
     });
 
     it("should throw an error if no schema is found when providing XSD content as a file", async () => {
