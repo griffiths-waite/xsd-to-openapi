@@ -2,12 +2,12 @@
 A tool for converting XSD files to OpenAPI 3.0/3.1 JSON specifications.
 
 ## Installation
-```
+```bash
 npm install xsd-to-openapi
 ```
 
 ## Usage
-To use this tool, you will need to pass in either an `inputFilePath` for the XSD file or the content of the XSD file as a string.
+To use this tool, you may either specify an `inputFilePath` (the path to your XSD file) or provide the XSD content directly using the `xsdContent` property. The function returns a Promise that resolves to the generated OpenAPI specification object. For more details on available options, see the [Configuration section](#configuration).
 
 **Generation from the file path of an XSD file**
 ```ts
@@ -44,7 +44,6 @@ const myXsdString = `
     </xsd:complexType>
 </xsd:schema>
 `
-// Generate and write an OpenAPI spec from a string
 await xsdToOpenApi({
     xsdContent: myXsdString,
     outputFilePath: myOutputFilePath,
@@ -56,35 +55,33 @@ If you want to write the JSON specification to a file, then you should also spec
 ## Features
 ### XSD Support
 - XSD parsing:
-  - Sequences, choices, complex types, attributes.
-  - Nested elements and types.
-  - Reference resolution for elements and types.
-- XSD facet handling:
-  - `minOccurs` and `maxOccurs` as array constraints (minItems and maxItems).
-  - `default` and `fixed` values -> default properties.
+  - Supports elements, sequences, choices and complex types.
+  - Handles nested elements and types.
+  - Resolves references for elements and types (both internally and from imported XSD schemas).
 - XSD schema imports:
-  - Resolve imports from relative paths (requires `inputFilePath`).
+  - Resolves imports from relative paths (requires `inputFilePath`).
   - Handle circular references between schemas.
 
 ### OpenAPI Spec Generation
 - Generate OpenAPI 3.0/3.1 JSON specifications:
   - Automatically create paths from matching request/response elements.
-  - Pair elements using naming patterns (e.g. `GetUserRequest` and `GetUserResponse` -> `/GetUser`).
-  - Configurable request/response suffixes (default: `"Req"` and `"Res"`).
-  - Maps XSD data types to JSON schema types.
-  - Adds request bodies and responses with content types.
+  - Uses naming patterns to generate paths (e.g. `GetUserRequest` and `GetUserResponse` become `/GetUser`).
+  - Configurable suffixes for identifying request/response elements for each endpoint.
+  - Maps common XSD data types to basic JSON data types.
+
 ### Configuration
+The following configuration options can be specified:
 - `inputFilePath` - Path to the input XSD file
-- `outputFilePath` - Path to the output OpenAPI JSON file
-- `xsdContent` - XSD content as a string (used if `inputFilePath` is not passed in)
-- `schemaName` - Optional name for the API schema (used as the pathname if `useSchemaNameInPath` flag is enabled)
-- `specGenerationOptions`
-  - `requestSuffix` - the suffix for getting request elements by name (default: `"Req"`).
-  - `responseSuffix` - the suffix for getting request elements by name (default: `"Res"`).
-  - `useSchemaNameInPath` - flag for setting the schema name in the path (default: `false`).
+- `outputFilePath` - Path where the OpenAPI JSON specification file will be written
+- `xsdContent` - XSD content as a string (used if `inputFilePath` is not provided)
+- `schemaName` - Optional name for the API schema (used as the pathname if `useSchemaNameInPath` is `true`)
+- `specGenerationOptions` - Additional options for customising the process of generating the OpenAPI spec.
+  - `requestSuffix` - Suffix for getting request elements by name (default: `"Req"`).
+  - `responseSuffix` - Suffix for getting request elements by name (default: `"Res"`).
+  - `useSchemaNameInPath` - Whether to include the schema name in the endpoint path (e.g. `schemaName/endpointName`) (default: `false`).
   - `httpMethod` - HTTP method for all operations (default: `"post"`).
-  - `contentType` - Content type for all operations (default: `"applicaton/json"`).
-  - `error` - Optional error schema options (used for all operations and is not included by default)
+  - `contentType` - Content type for all operations (default: `"application/json"`).
+  - `error` - Optional error schema options (applied to all operations and is not included by default)
     - `errorSchema` - JSON schema for the error response.
     - `errorStatusCode` - HTTP status code for the error response.
     - `errorDescription` - Description for the error response schema.
