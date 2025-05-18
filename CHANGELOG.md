@@ -1,5 +1,15 @@
 # xsd-to-openapi
 
+## 1.2.1
+
+### Patch Changes
+
+- 651c23d: - **Add readme documentation for tool**
+  Other changes:
+    - Update `basic.xsd` fixture file
+    - Remove a couple of redundant tests
+    - Return the generated OpenAPI spec for programmatic consumption
+
 ## 1.2.0
 
 ### Minor Changes
