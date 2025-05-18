@@ -144,7 +144,7 @@ interface ErrorSchemaOptions {
     errorDescription?: string;
 }
 
-type HttpMethods = "get" | "post" | "put" | "delete" | "patch";
+type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
 export interface XsdToOpenApiConfig {
     inputFilePath?: string;
@@ -472,7 +472,7 @@ interface SpecGeneratorOptions {
     requestSuffix?: string;
     responseSuffix?: string;
     useSchemaNameInPath?: boolean;
-    httpMethod?: HttpMethods;
+    httpMethod?: HttpMethod;
     openApiVersion?: string;
     openApiSpecDescription?: string;
     contentType?: string;
