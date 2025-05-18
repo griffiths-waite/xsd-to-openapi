@@ -70,18 +70,21 @@ If you want to write the JSON specification to a file, then you should also spec
   - Maps common XSD data types to basic JSON data types.
 
 ### Configuration
-The following configuration options can be specified:
-- `inputFilePath` - Path to the input XSD file
-- `outputFilePath` - Path where the OpenAPI JSON specification file will be written
-- `xsdContent` - XSD content as a string (used if `inputFilePath` is not provided)
-- `schemaName` - Optional name for the API schema (used as the pathname if `useSchemaNameInPath` is `true`)
-- `specGenerationOptions` - Additional options for customising the process of generating the OpenAPI spec.
-  - `requestSuffix` - Suffix for getting request elements by name (default: `"Req"`).
-  - `responseSuffix` - Suffix for getting request elements by name (default: `"Res"`).
-  - `useSchemaNameInPath` - Whether to include the schema name in the endpoint path (e.g. `schemaName/endpointName`) (default: `false`).
-  - `httpMethod` - HTTP method for all operations (default: `"post"`).
-  - `contentType` - Content type for all operations (default: `"application/json"`).
-  - `error` - Optional error schema options (applied to all operations and is not included by default)
-    - `errorSchema` - JSON schema for the error response.
-    - `errorStatusCode` - HTTP status code for the error response.
-    - `errorDescription` - Description for the error response schema.
+The tool can be configured with the following options:
+
+| Option                                         | Type      | Description                                                                                                                                                                                         | Required |
+| ---------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `inputFilePath`                                | `String`  | Path to the input XSD file.                                                                                                                                                                         | No       |
+| `outputFilePath`                               | `String`  | Path where the OpenAPI JSON specification file will be written.                                                                                                                                     | No       |
+| `xsdContent`                                   | `String`  | XSD content as a string (used if `inputFilePath` is not provided).                                                                                                                                  | No       |
+| `schemaName`                                   | `String`  | Optional name for the API schema (used as the path name if `useSchemaNameInPath` is `true`).                                                                                                        | No       |
+| `specGenerationOptions`                        | `Object`  | Additional options for customising the process of generating the OpenAPI spec.                                                                                                                      | No       |
+| `specGenerationOptions.requestSuffix`          | `String`  | Suffix for identifying request elements by name (default: `"Req"`).                                                                                                                                 | No       |
+| `specGenerationOptions.responseSuffix`         | `String`  | Suffix for identifying response elements by name (default: `"Res"`).                                                                                                                                | No       |
+| `specGenerationOptions.useSchemaNameInPath`    | `Boolean` | Whether to include the schema name in the endpoint path (e.g. `schemaName/endpointName`) (default: `false`). If this is set to `true` and `schemaName` is not set, then the file name will be used. | No       |
+| `specGenerationOptions.httpMethod`             | `String`  | HTTP method for all operations (default: `"post"`).                                                                                                                                                 | No       |
+| `specGenerationOptions.contentType`            | `String`  | Content type for all operations (default: `"application/json"`).                                                                                                                                    | No       |
+| `specGenerationOptions.error`                  | `Object`  | Optional error schema options (applied to all operations and is not included by default).                                                                                                           | No       |
+| `specGenerationOptions.error.errorSchema`      | `Object`  | JSON schema for the error response.                                                                                                                                                                 | Yes      |
+| `specGenerationOptions.error.errorStatusCode`  | `String`  | HTTP status code for the error response (e.g., `"400"`, `"500"`).                                                                                                                                   | Yes      |
+| `specGenerationOptions.error.errorDescription` | `String`  | Description for the error response schema.                                                                                                                                                          | No       |
