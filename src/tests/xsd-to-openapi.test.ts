@@ -24,12 +24,12 @@ describe("XSD to OpenAPI Converter", () => {
             outputFilePath,
             schemaName: "basictest",
             specGenerationOptions: {
-                openApiVersion: "3.1.0",
                 useSchemaNameInPath: true,
             },
         });
 
         const result = require(outputFilePath);
+
         expect(result.openapi).toBe("3.1.0");
         expect(result.paths["/basictest/Test"]).toBeDefined();
         expect(result.paths["/basictest/Test"].post.requestBody.content["application/json"].schema).toMatchObject({
@@ -49,7 +49,6 @@ describe("XSD to OpenAPI Converter", () => {
             outputFilePath,
             schemaName: "basictest",
             specGenerationOptions: {
-                openApiVersion: "3.1.0",
                 useSchemaNameInPath: true,
             },
         });

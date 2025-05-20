@@ -169,7 +169,6 @@ export interface XsdToOpenApiConfig {
  * @param specGenerationOptions.responseSuffix - Suffix for response elements. Default is "Res".
  * @param specGenerationOptions.useSchemaNameInPath - Whether to use the schema name in the path. Default is false.
  * @param specGenerationOptions.httpMethod - HTTP method for the operation. Default is "post".
- * @param specGenerationOptions.openApiVersion - OpenAPI version. Default is "3.0.0".
  * @param specGenerationOptions.openApiSpecDescription - Description for the OpenAPI spec.
  * @param specGenerationOptions.contentType - Content type for the request and response. Default is "application/json".
  * @param specGenerationOptions.defaultType - Default type for elements. Default is "string".
@@ -473,7 +472,6 @@ interface SpecGeneratorOptions {
     responseSuffix?: string;
     useSchemaNameInPath?: boolean;
     httpMethod?: HttpMethod;
-    openApiVersion?: string;
     openApiSpecDescription?: string;
     contentType?: string;
     defaultType?: OpenApiType;
@@ -491,7 +489,6 @@ async function generateOpenApiSpec(
         requestSuffix = "Req",
         responseSuffix = "Res",
         error,
-        openApiVersion = "3.0.0",
         httpMethod = "post",
         contentType = "application/json",
         defaultType = "string",
@@ -500,10 +497,10 @@ async function generateOpenApiSpec(
     } = options;
 
     const specDescription =
-        openApiSpecDescription || `OpenAPI ${openApiVersion} specification generated from XSD schema ${schemaName}`;
+        openApiSpecDescription || `OpenAPI 3.1.0 specification generated from XSD schema ${schemaName}`;
 
     const openApiSpec: OpenApiSpec = {
-        openapi: openApiVersion,
+        openapi: "3.1.0",
         info: {
             title: schemaName,
             description: specDescription,
