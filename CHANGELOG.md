@@ -1,5 +1,11 @@
 # xsd-to-openapi
 
+## 1.2.2
+
+### Patch Changes
+
+- 02310d6: Remove openApiVersion prop
+
 ## 1.2.1
 
 ### Patch Changes
