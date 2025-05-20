@@ -1,5 +1,5 @@
 # xsd-to-openapi
-A tool for converting XSD files to OpenAPI 3.0/3.1 JSON specifications.
+A tool for converting XSD files to OpenAPI 3.1 JSON specifications.
 
 ## Installation
 ```bash
