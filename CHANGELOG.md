@@ -1,5 +1,11 @@
 # xsd-to-openapi
 
+## 1.2.3
+
+### Patch Changes
+
+- 4d35734: Update dependencies
+
 ## 1.2.2
 
 ### Patch Changes
