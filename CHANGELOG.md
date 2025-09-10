@@ -1,5 +1,11 @@
 # xsd-to-openapi
 
+## 1.3.0
+
+### Minor Changes
+
+- d599325: Refactor error schema logic to allow for passing in the filepath to an XSD schema for an error response
+
 ## 1.2.3
 
 ### Patch Changes
