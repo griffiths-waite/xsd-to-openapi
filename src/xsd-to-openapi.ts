@@ -27,10 +27,7 @@ export interface OpenApiSpec {
     paths: Record<string, PathItem>;
 }
 
-interface PathItem {
-    [key: string]: Operation | undefined;
-}
-
+type PathItem = Partial<Record<HttpMethod, Operation>>;
 interface SchemaProperty {
     type: string;
     items?: Schema;
@@ -138,11 +135,14 @@ interface XsdObject {
     "xs:schema"?: XsdSchema;
 }
 
-interface ErrorSchemaOptions {
-    errorSchema: Schema;
-    errorStatusCode: number;
+type ErrorSchemaOptions = (
+    | { errorSchemaFilePath: string; errorSchemaContent?: never }
+    | { errorSchemaContent: string; errorSchemaFilePath?: never }
+) & {
+    errorStatusCode: string;
     errorDescription?: string;
-}
+    errorTypeName?: string;
+};
 
 type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
@@ -173,10 +173,11 @@ export interface XsdToOpenApiConfig {
  * @param specGenerationOptions.contentType - Content type for the request and response. Default is "application/json".
  * @param specGenerationOptions.defaultType - Default type for elements. Default is "string".
  * @param specGenerationOptions.error - Error schema options.
- * @param specGenerationOptions.error.errorSchema - JSON Schema for the error response.
+ * @param specGenerationOptions.error.errorSchemaFilePath - Path to the error schema XSD file (mutually exclusive with errorSchemaContent).
+ * @param specGenerationOptions.error.errorSchemaContent - Error schema XSD content as string (mutually exclusive with errorSchemaFilePath).
  * @param specGenerationOptions.error.errorStatusCode - HTTP status code for the error response.
  * @param specGenerationOptions.error.errorDescription - Description for the error response schema.
- *
+ * @param specGenerationOptions.error.errorTypeName - Optional name of the error type to use look for in the XSD schema.
  */
 export async function xsdToOpenApi({
     inputFilePath,
@@ -343,6 +344,11 @@ type GenerateSchemaParams = {
     defaultType: OpenApiType;
 };
 
+function extractComplexTypes(xsdSchema: XsdSchema): XsdComplexType[] {
+    const rawComplexTypes = xsdSchema["xsd:complexType"] || xsdSchema["xs:complexType"];
+    return rawComplexTypes ? (Array.isArray(rawComplexTypes) ? rawComplexTypes : [rawComplexTypes]) : [];
+}
+
 function generateSchema({
     xsdSchema,
     typeName,
@@ -350,12 +356,7 @@ function generateSchema({
     importedSchemas,
     defaultType,
 }: GenerateSchemaParams) {
-    const rawComplexTypes = xsdSchema["xsd:complexType"] || xsdSchema["xs:complexType"];
-
-    const complexTypes: XsdComplexType[] = Array.isArray(rawComplexTypes)
-        ? rawComplexTypes
-        : [rawComplexTypes].filter((complexType) => complexType);
-
+    const complexTypes: XsdComplexType[] = extractComplexTypes(xsdSchema);
     const complexType = complexTypes.find((ct) => ct["@_name"] === typeName);
 
     if (!complexType) {
@@ -517,7 +518,6 @@ async function generateOpenApiSpec(
     );
 
     const rawElements = xsdSchema["xsd:element"] || xsdSchema["xs:element"];
-
     const validElements = Array.isArray(rawElements) ? rawElements : [rawElements].filter((element) => element);
 
     const groupedElements = validElements.reduce(
@@ -553,8 +553,8 @@ async function generateOpenApiSpec(
         {} as Record<string, { request?: XsdElement; response?: XsdElement }>,
     );
 
-    Object.entries(groupedElements).forEach(([pathName, { request, response }]) => {
-        if (!request && !response) return;
+    for (const [pathName, { request, response }] of Object.entries(groupedElements)) {
+        if (!request && !response) continue;
 
         const openApiPathName = useSchemaNameInPath ? `/${schemaName}/${pathName}` : `/${pathName}`;
 
@@ -565,13 +565,13 @@ async function generateOpenApiSpec(
         };
 
         if (request) {
-            const responseDescription =
+            const requestDescription =
                 request["xsd:annotation"]?.[0]?.["xsd:documentation"]?.[0] ||
                 request["xs:annotation"]?.[0]?.["xs:documentation"]?.[0];
 
             operation.requestBody = {
                 required: request["@_minOccurs"] !== "0",
-                description: responseDescription,
+                description: requestDescription,
                 content: {
                     [contentType]: {
                         schema: generateSchema({
@@ -606,18 +606,46 @@ async function generateOpenApiSpec(
         }
 
         if (error) {
-            operation.responses[error.errorStatusCode] = {
-                description: error.errorDescription,
-                content: {
-                    [contentType]: {
-                        schema: error.errorSchema,
+            let errorXsdSchema: XsdSchema | undefined;
+
+            try {
+                if (error?.errorSchemaContent) {
+                    const parsedErrorXsdContent = parser.parse(error.errorSchemaContent) as XsdObject;
+                    errorXsdSchema = parsedErrorXsdContent["xsd:schema"] || parsedErrorXsdContent["xs:schema"];
+                } else if (error?.errorSchemaFilePath) {
+                    if (existsSync(error.errorSchemaFilePath)) {
+                        const errorXsdFile = await readFile(error.errorSchemaFilePath, "utf8");
+                        const parsedErrorXsdFile = parser.parse(errorXsdFile) as XsdObject;
+                        errorXsdSchema = parsedErrorXsdFile["xsd:schema"] || parsedErrorXsdFile["xs:schema"];
+                    } else {
+                        throw new Error(`Error schema file not found: ${error.errorSchemaFilePath}`);
+                    }
+                }
+            } catch (error) {
+                throw new Error(`Failed to parse error schema: ${error}`);
+            }
+
+            if (errorXsdSchema) {
+                const complexTypes = extractComplexTypes(errorXsdSchema);
+                const typeName = error?.errorTypeName ?? complexTypes[0]?.["@_name"];
+
+                operation.responses[error.errorStatusCode] = {
+                    description: error.errorDescription || "Error response",
+                    content: {
+                        [contentType]: {
+                            schema: generateSchema({
+                                xsdSchema: errorXsdSchema,
+                                typeName,
+                                defaultType,
+                            }),
+                        },
                     },
-                },
-            };
+                };
+            }
         }
 
         openApiSpec.paths[openApiPathName] = { [httpMethod]: operation };
-    });
+    }
 
     return openApiSpec;
 }

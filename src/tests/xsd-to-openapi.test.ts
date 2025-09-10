@@ -22,7 +22,7 @@ describe("XSD to OpenAPI Converter", () => {
         await xsdToOpenApi({
             inputFilePath,
             outputFilePath,
-            schemaName: "basictest",
+            schemaName: "basic",
             specGenerationOptions: {
                 useSchemaNameInPath: true,
             },
@@ -31,8 +31,8 @@ describe("XSD to OpenAPI Converter", () => {
         const result = require(outputFilePath);
 
         expect(result.openapi).toBe("3.1.0");
-        expect(result.paths["/basictest/Test"]).toBeDefined();
-        expect(result.paths["/basictest/Test"].post.requestBody.content["application/json"].schema).toMatchObject({
+        expect(result.paths["/basic/Test"]).toBeDefined();
+        expect(result.paths["/basic/Test"].post.requestBody.content["application/json"].schema).toMatchObject({
             type: "object",
             properties: {
                 stringField: { type: "string" },
@@ -47,15 +47,15 @@ describe("XSD to OpenAPI Converter", () => {
         await xsdToOpenApi({
             xsdContent,
             outputFilePath,
-            schemaName: "basictest",
+            schemaName: "basic",
             specGenerationOptions: {
                 useSchemaNameInPath: true,
             },
         });
 
         const result = require(outputFilePath);
-        expect(result.paths["/basictest/Test"]).toBeDefined();
-        expect(result.paths["/basictest/Test"].post.requestBody.content["application/json"].schema).toMatchObject({
+        expect(result.paths["/basic/Test"]).toBeDefined();
+        expect(result.paths["/basic/Test"].post.requestBody.content["application/json"].schema).toMatchObject({
             type: "object",
             properties: {
                 stringField: { type: "string" },
@@ -480,5 +480,100 @@ describe("XSD to OpenAPI Converter", () => {
                 outputFilePath,
             }),
         ).rejects.toThrowError("Input file not found");
+    });
+
+    it("should generate an error response correctly if a filepath to the error schema is provided", async () => {
+        const inputFilePath = path.join(fixturesDir, "basic.xsd");
+        const errorSchemaFilePath = path.join(fixturesDir, "error-schema.xsd");
+        const outputFilePath = path.join(outputDir, "error-schema.json");
+
+        await xsdToOpenApi({
+            inputFilePath,
+            outputFilePath,
+            schemaName: "basic",
+            specGenerationOptions: {
+                error: {
+                    errorSchemaFilePath,
+                    errorStatusCode: "500",
+                },
+                useSchemaNameInPath: true,
+            },
+        });
+
+        const result = require(outputFilePath);
+
+        const errorResponse = result.paths["/basic/Test"].post.responses[500];
+
+        expect(errorResponse).toBeDefined();
+        expect(errorResponse.content["application/json"].schema).toMatchObject({
+            type: "object",
+            properties: {
+                Code: {
+                    type: "string",
+                },
+                Detail: {
+                    type: "string",
+                },
+            },
+            required: ["Code"],
+        });
+    });
+
+    it("should generate an error response correctly if the content of an error schema is provided", async () => {
+        const inputFilePath = path.join(fixturesDir, "basic.xsd");
+        const errorSchemaContent = await readFile(path.join(fixturesDir, "error-schema.xsd"), "utf-8");
+        const outputFilePath = path.join(outputDir, "error-schema.json");
+
+        await xsdToOpenApi({
+            inputFilePath,
+            outputFilePath,
+            schemaName: "basic",
+            specGenerationOptions: {
+                error: {
+                    errorSchemaContent,
+                    errorStatusCode: "500",
+                },
+                useSchemaNameInPath: true,
+            },
+        });
+
+        const result = require(outputFilePath);
+
+        const errorResponse = result.paths["/basic/Test"].post.responses[500];
+
+        expect(errorResponse).toBeDefined();
+        expect(errorResponse.content["application/json"].schema).toMatchObject({
+            type: "object",
+            properties: {
+                Code: {
+                    type: "string",
+                },
+                Detail: {
+                    type: "string",
+                },
+            },
+            required: ["Code"],
+        });
+    });
+
+    it("should throw an error if the error schema file cannot be found", async () => {
+        const inputFilePath = path.join(fixturesDir, "basic.xsd");
+        const errorSchemaFilePath = path.join(fixturesDir, "error-schema-2.xsd");
+        const outputFilePath = path.join(outputDir, "error-schema.json");
+
+        await expect(
+            xsdToOpenApi({
+                inputFilePath,
+                outputFilePath,
+                schemaName: "basic",
+                specGenerationOptions: {
+                    error: {
+                        errorSchemaFilePath,
+                        errorStatusCode: "500",
+                    },
+                    useSchemaNameInPath: true,
+                },
+            }),
+        ).rejects.toThrowError("Error schema file not found");
     });
 });
